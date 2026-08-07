@@ -1,0 +1,35 @@
+{
+  "name": "sauna-monitor",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "esbuild frontend/app.ts --bundle --format=esm --target=es2022 --minify --outfile=public/app.js",
+    "check": "npm run typecheck && npm run typecheck:frontend && npm run test && npm run build",
+    "db:create": "wrangler d1 create sauna-monitor-db --binding DB --update-config",
+    "db:migrate:local": "wrangler d1 migrations apply sauna-monitor-db --local",
+    "db:migrate:remote": "wrangler d1 migrations apply sauna-monitor-db --remote",
+    "deploy": "npm run build && wrangler deploy",
+    "dev": "npm run build && wrangler dev",
+    "seed:local": "node scripts/seed-local.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "typecheck:frontend": "tsc -p tsconfig.frontend.json --noEmit"
+  },
+  "dependencies": {
+    "vega": "6.3.1",
+    "vega-embed": "7.1.0",
+    "vega-lite": "6.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "5.20260804.1",
+    "esbuild": "0.28.1",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10",
+    "wrangler": "4.118.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

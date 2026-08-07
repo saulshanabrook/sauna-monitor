@@ -1,0 +1,31 @@
+{
+  "end_device_ids": {
+    "device_id": "ltc2-lb",
+    "application_ids": {
+      "application_id": "sauna"
+    },
+    "dev_eui": "A84041A47C61C1E2"
+  },
+  "correlation_ids": [
+    "gs:uplink:sample-0001"
+  ],
+  "received_at": "2026-08-05T01:29:24.000Z",
+  "uplink_message": {
+    "session_key_id": "sample-session",
+    "f_port": 2,
+    "f_cnt": 1,
+    "decoded_payload": {
+      "BatV": 3.618,
+      "Data_time": "2099-01-01 00:00:00",
+      "Temp_Channel1": 25.2,
+      "Temp_Channel2": 25.4
+    },
+    "rx_metadata": [
+      {
+        "rssi": -62,
+        "snr": 9.5
+      }
+    ]
+  }
+}
+

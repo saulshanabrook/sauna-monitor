@@ -1,0 +1,4 @@
+# Copy this file to .dev.vars before running `npm run dev`.
+# Use the same password when configuring TTS Request authentication.
+WEBHOOK_PASSWORD=development-only-change-me
+

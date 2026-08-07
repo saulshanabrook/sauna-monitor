@@ -1,0 +1,10 @@
+node_modules/
+.dev.vars
+.env*
+!.env.example
+.wrangler/
+public/app.js
+public/app.js.map
+coverage/
+*.log
+

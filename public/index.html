@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="dark">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'"
+    >
+    <meta name="description" content="Live and historical temperature monitoring for the woodland sauna.">
+    <title>Woodland Sauna</title>
+    <link rel="stylesheet" href="/styles.css">
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <main class="shell">
+      <header class="masthead">
+        <div>
+          <p class="eyebrow">Live conditions</p>
+          <h1 id="site-name">Woodland Sauna</h1>
+        </div>
+        <div class="header-controls">
+          <div id="status-badge" class="status-badge status-offline" role="status">
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="status-text">Waiting for data</span>
+          </div>
+          <label class="unit-control">
+            <span>Units</span>
+            <select id="unit-select" aria-label="Temperature units">
+              <option value="f">°F</option>
+              <option value="c">°C</option>
+            </select>
+          </label>
+        </div>
+      </header>
+
+      <div id="error-banner" class="error-banner" role="alert" hidden></div>
+
+      <section class="current-grid" aria-label="Current readings">
+        <article class="metric-card metric-sauna">
+          <p class="metric-label">Sauna air</p>
+          <p class="metric-value"><span id="sauna-temp">—</span><span id="sauna-unit" class="metric-unit">°F</span></p>
+          <p id="sauna-rate" class="metric-detail">Collecting trend…</p>
+        </article>
+        <article class="metric-card metric-pipe">
+          <p class="metric-label">Stovepipe</p>
+          <p class="metric-value"><span id="pipe-temp">—</span><span id="pipe-unit" class="metric-unit">°F</span></p>
+          <p id="pipe-rate" class="metric-detail">Collecting trend…</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">Heating rate</p>
+          <p class="metric-value metric-value-small"><span id="heating-rate">—</span></p>
+          <p class="metric-detail">15-minute stovepipe trend</p>
+        </article>
+        <article class="metric-card">
+          <p class="metric-label">System</p>
+          <p id="session-state" class="system-state">No active heating session</p>
+          <p id="last-updated" class="metric-detail">No readings received</p>
+          <p id="battery" class="metric-detail">Battery —</p>
+        </article>
+      </section>
+
+      <section class="panel history-panel" aria-labelledby="history-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">History</p>
+            <h2 id="history-title">Temperature and heating trend</h2>
+          </div>
+          <div id="range-controls" class="range-controls" role="group" aria-label="History range">
+            <button type="button" data-range="24h" aria-pressed="true">24 hours</button>
+            <button type="button" data-range="7d" aria-pressed="false">7 days</button>
+            <button type="button" data-range="30d" aria-pressed="false">30 days</button>
+            <button type="button" data-range="90d" aria-pressed="false">90 days</button>
+            <button type="button" data-range="1y" aria-pressed="false">1 year</button>
+            <button type="button" data-range="all" aria-pressed="false">All</button>
+          </div>
+        </div>
+        <div id="temperature-chart" class="chart" aria-label="Temperature history chart"></div>
+        <div class="chart-divider"></div>
+        <div id="rate-chart" class="chart" aria-label="Temperature rate of change chart"></div>
+        <p class="chart-note">
+          Lines show bucket averages; the faint bands preserve minimum and maximum temperatures.
+          Rate is a trailing least-squares trend, not a point-to-point jump.
+        </p>
+      </section>
+
+      <section class="panel" aria-labelledby="sessions-title">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Usage</p>
+            <h2 id="sessions-title">Sauna sessions by month</h2>
+          </div>
+          <p id="session-summary" class="panel-summary">Waiting for enough data</p>
+        </div>
+        <div id="sessions-chart" class="chart chart-short" aria-label="Monthly sauna sessions chart"></div>
+        <p class="chart-note">
+          A session is inferred from sustained stovepipe heat. The current month is partial and is not a safety record.
+        </p>
+      </section>
+
+      <footer>
+        <p><strong>Informational monitoring only.</strong> This cloud display is not a fire-safety or overfire alarm. Use the independent local alarm for safety.</p>
+      </footer>
+    </main>
+    <noscript>This dashboard requires JavaScript to render its charts.</noscript>
+  </body>
+</html>
+
