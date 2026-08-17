@@ -156,10 +156,6 @@ p { margin-top: 0; }
   font-size: clamp(1.3rem, 3vw, 1.9rem);
 }
 
-.status-value-dim {
-  color: var(--ink-dim);
-}
-
 .range-controls {
   display: flex;
   flex-wrap: wrap;

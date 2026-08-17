@@ -195,8 +195,8 @@ describe("frontend Content Security Policy", () => {
     expect(elements.get("heat-detail-label").textContent).toBe("ESTIMATED HOT");
     expect(elements.get("heat-detail").textContent).toBe("2:10 PM");
     expect(elements.get("heat-detail-row").hidden).toBe(false);
-    expect(elements.get("heat-basis").textContent).toBe("LAST 15 MINUTES");
-    expect(elements.get("heat-basis-row").hidden).toBe(false);
+    expect(elements.has("heat-basis")).toBe(false);
+    expect(elements.has("heat-basis-row")).toBe(false);
     expect(spec.vconcat.map((chart) => chart.title)).toEqual([
       "Air",
       "Air change",
@@ -293,6 +293,9 @@ describe("frontend Content Security Policy", () => {
     expect(html).toContain('id="target-temp"');
     expect(html).toContain('value="180"');
     expect(html).toContain('id="heat-state"');
+    expect(html).not.toContain('id="heat-basis"');
+    expect(html).not.toContain('id="heat-basis-row"');
+    expect(html).not.toContain(">Trend<");
     expect(html).not.toContain('id="theme-controls"');
     expect(html).not.toContain("data-theme=");
     expect(css).toContain("@media (prefers-color-scheme: dark)");

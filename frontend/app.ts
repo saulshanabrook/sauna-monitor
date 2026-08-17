@@ -15,7 +15,6 @@ interface Measurement {
 interface CurrentPayload {
   site_name: string;
   time_zone: string;
-  rate_window_minutes: number;
   status: ReadingStatus;
   session_active: boolean;
   current: null | {
@@ -74,8 +73,6 @@ const ui = {
   heatDetailRow: element("heat-detail-row"),
   heatDetailLabel: element("heat-detail-label"),
   heatDetail: element("heat-detail"),
-  heatBasisRow: element("heat-basis-row"),
-  heatBasis: element("heat-basis"),
   historyCharts: element("history-charts"),
   rangeControls: element("range-controls"),
 };
@@ -191,11 +188,6 @@ function refreshHeatDisplay(): void {
   ui.heatDetailLabel.textContent = showingEta ? "ESTIMATED HOT" : "ESTIMATE";
   ui.heatDetail.textContent = projection.detail;
   ui.heatDetailRow.hidden = projection.detail.length === 0;
-  const showBasis = projection.state === "eta" && Number.isFinite(payload?.rate_window_minutes);
-  ui.heatBasis.textContent = showBasis
-    ? `LAST ${payload?.rate_window_minutes} MINUTES`
-    : "";
-  ui.heatBasisRow.hidden = !showBasis;
 }
 
 function refreshCurrentDisplay(): void {
