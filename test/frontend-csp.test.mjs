@@ -296,6 +296,7 @@ describe("frontend Content Security Policy", () => {
     expect(html).not.toContain('id="heat-basis"');
     expect(html).not.toContain('id="heat-basis-row"');
     expect(html).not.toContain(">Trend<");
+    expect(css).toContain(".status-row[hidden] { display: none; }");
     expect(html).not.toContain('id="theme-controls"');
     expect(html).not.toContain("data-theme=");
     expect(css).toContain("@media (prefers-color-scheme: dark)");

@@ -70,6 +70,8 @@ p { margin-top: 0; }
   gap: 20px;
 }
 
+.status-row[hidden] { display: none; }
+
 .instrument-label,
 .status-label {
   min-width: 0;
