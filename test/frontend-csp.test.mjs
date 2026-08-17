@@ -15,6 +15,7 @@ class FakeClassList {
 }
 
 class FakeElement {
+  attributes = {};
   classList = new FakeClassList();
   clientWidth = 0;
   dataset = {};
@@ -28,9 +29,11 @@ class FakeElement {
 
   addEventListener() {}
   append() {}
+  getAttribute(name) { return this.attributes[name] ?? null; }
   querySelector() { return null; }
   replaceChildren() {}
   querySelectorAll() { return []; }
+  setAttribute(name, value) { this.attributes[name] = String(value); }
 }
 
 function jsonResponse(value) {
@@ -64,6 +67,7 @@ describe("frontend Content Security Policy", () => {
     const elements = new Map();
     const fakeDocument = {
       body: new FakeElement(),
+      documentElement: new FakeElement(),
       title: "",
       createElement: () => new FakeElement(),
       getElementById: (id) => {
@@ -74,13 +78,30 @@ describe("frontend Content Security Policy", () => {
         return created;
       },
     };
+    let colorSchemeClick;
+    const colorSchemeControls = fakeDocument.getElementById("color-scheme-controls");
+    colorSchemeControls.addEventListener = (_type, listener) => { colorSchemeClick = listener; };
+    const systemScheme = new FakeElement();
+    systemScheme.dataset.colorScheme = "system";
+    systemScheme.closest = () => systemScheme;
+    const lightScheme = new FakeElement();
+    lightScheme.dataset.colorScheme = "light";
+    lightScheme.closest = () => lightScheme;
+    const darkScheme = new FakeElement();
+    darkScheme.dataset.colorScheme = "dark";
+    darkScheme.closest = () => darkScheme;
+    const colorSchemeButtons = [systemScheme, lightScheme, darkScheme];
+    colorSchemeControls.querySelectorAll = (selector) =>
+      selector === "button[data-color-scheme]" ? colorSchemeButtons : [];
+    const storedValues = new Map();
     vi.stubGlobal("window", {
       addEventListener() {},
       removeEventListener() {},
       matchMedia: () => colorSchemeQuery,
       localStorage: {
-        getItem: () => null,
-        setItem() {},
+        getItem: (key) => storedValues.get(key) ?? null,
+        removeItem: (key) => storedValues.delete(key),
+        setItem: (key, value) => storedValues.set(key, String(value)),
       },
     });
     const historyCharts = fakeDocument.getElementById("history-charts");
@@ -166,6 +187,10 @@ describe("frontend Content Security Policy", () => {
       renderer: "canvas",
       ast: true,
     });
+    expect(fakeDocument.documentElement.dataset.colorScheme).toBe("dark");
+    expect(systemScheme.getAttribute("aria-pressed")).toBe("true");
+    expect(lightScheme.getAttribute("aria-pressed")).toBe("false");
+    expect(darkScheme.getAttribute("aria-pressed")).toBe("false");
     expect(spec.config.axis.gridColor).toBe("#2b1705");
     expect(spec.config.axis.labelColor).toBe("#f7941d");
     expect(spec.vconcat[0].layer[0].mark.color).toBe("#f7941d");
@@ -281,12 +306,34 @@ describe("frontend Content Security Policy", () => {
     const lightSpec = embed.mock.calls[1][1];
     expect(lightSpec.config.axis.gridColor).toBe("#adb5aa");
     expect(lightSpec.vconcat[0].layer[0].mark.color).toBe("#0c1516");
+    expect(fakeDocument.documentElement.dataset.colorScheme).toBe("light");
+
+    expect(colorSchemeClick).toBeTypeOf("function");
+    colorSchemeClick({ target: darkScheme });
+    await vi.waitFor(() => expect(embed).toHaveBeenCalledTimes(3));
+    expect(fakeDocument.documentElement.dataset.colorScheme).toBe("dark");
+    expect(storedValues.get("sauna-time-color-scheme")).toBe("dark");
+    expect(darkScheme.getAttribute("aria-pressed")).toBe("true");
+    const manualDarkSpec = embed.mock.calls[2][1];
+    expect(manualDarkSpec.config.axis.gridColor).toBe("#2b1705");
+
+    colorSchemeClick({ target: systemScheme });
+    await vi.waitFor(() => expect(embed).toHaveBeenCalledTimes(4));
+    expect(fakeDocument.documentElement.dataset.colorScheme).toBe("light");
+    expect(storedValues.has("sauna-time-color-scheme")).toBe(false);
+    expect(systemScheme.getAttribute("aria-pressed")).toBe("true");
   });
 
   it("keeps only the requested controls and separate sensor charts", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
     const css = readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
+    const colorSchemeScript = readFileSync(
+      new URL("../public/color-scheme.js", import.meta.url),
+      "utf8",
+    );
     const ranges = [...html.matchAll(/data-range="([^"]+)"/g)].map((match) => match[1]);
+    const colorSchemes = [...html.matchAll(/data-color-scheme="([^"]+)"/g)]
+      .map((match) => match[1]);
 
     expect(html).toContain('id="history-charts"');
     expect(html).toContain('class="instrument-ledger"');
@@ -302,7 +349,16 @@ describe("frontend Content Security Policy", () => {
     expect(css).toContain(".status-row[hidden] { display: none; }");
     expect(html).not.toContain('id="theme-controls"');
     expect(html).not.toContain("data-theme=");
-    expect(css).toContain("@media (prefers-color-scheme: dark)");
+    expect(html).toContain('id="color-scheme-controls"');
+    expect(colorSchemes).toEqual(["system", "light", "dark"]);
+    expect(html).toContain('data-color-scheme="system" aria-pressed="true"');
+    expect(html).toContain('<script src="/color-scheme.js"></script>');
+    expect(html.indexOf('<script src="/color-scheme.js"></script>'))
+      .toBeLessThan(html.indexOf('<link rel="stylesheet" href="/styles.css">'));
+    expect(colorSchemeScript).toContain('const storageKey = "sauna-time-color-scheme"');
+    expect(colorSchemeScript).toContain("window.localStorage.getItem(storageKey)");
+    expect(colorSchemeScript).toContain('window.matchMedia("(prefers-color-scheme: dark)")');
+    expect(css).toContain(':root[data-color-scheme="dark"]');
     expect(css).toContain("--lcd-background: linear-gradient(");
     expect(css).toContain("#f5d9e4 0%");
     expect(css).toContain("#e5dbf1 100%");

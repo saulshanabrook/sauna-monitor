@@ -10,6 +10,7 @@
     >
     <meta name="description" content="Live and historical sauna temperatures.">
     <title>Sauna Time</title>
+    <script src="/color-scheme.js"></script>
     <link rel="stylesheet" href="/styles.css">
     <script type="module" src="/app.js"></script>
   </head>
@@ -60,6 +61,12 @@
         </div>
         <div id="history-charts" class="charts" aria-label="Linked temperature and change charts"></div>
       </section>
+
+      <div id="color-scheme-controls" class="color-scheme-controls" role="group" aria-label="Color scheme">
+        <button type="button" data-color-scheme="system" aria-pressed="true">System</button>
+        <button type="button" data-color-scheme="light" aria-pressed="false">Light</button>
+        <button type="button" data-color-scheme="dark" aria-pressed="false">Dark</button>
+      </div>
     </main>
     <noscript>This dashboard requires JavaScript to render its charts.</noscript>
   </body>

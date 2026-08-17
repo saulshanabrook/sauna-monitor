@@ -4,6 +4,7 @@ import { projectHeatStatus, type ReadingStatus } from "./heat-status";
 
 type Unit = "f" | "c";
 type DisplayTheme = "gray" | "amber-led";
+type ColorSchemePreference = "system" | "light" | "dark";
 
 interface Measurement {
   c: number | null;
@@ -49,12 +50,14 @@ const state: {
   lastObservedAt: string | null;
   targetF: number;
   theme: DisplayTheme;
+  colorSchemePreference: ColorSchemePreference;
 } = {
   range: "3h",
   current: null,
   lastObservedAt: null,
   targetF: 180,
   theme: "gray",
+  colorSchemePreference: "system",
 };
 
 function element<T extends HTMLElement>(id: string): T {
@@ -75,9 +78,11 @@ const ui = {
   heatDetail: element("heat-detail"),
   historyCharts: element("history-charts"),
   rangeControls: element("range-controls"),
+  colorSchemeControls: element("color-scheme-controls"),
 };
 
 const TARGET_STORAGE_KEY = "sauna-time-target-f";
+const COLOR_SCHEME_STORAGE_KEY = "sauna-time-color-scheme";
 const TARGET_MIN_F = 100;
 const TARGET_MAX_F = 220;
 
@@ -122,7 +127,42 @@ ui.targetTemp.value = String(state.targetF);
 const colorSchemeQuery = typeof window === "undefined" || typeof window.matchMedia !== "function"
   ? null
   : window.matchMedia("(prefers-color-scheme: dark)");
-state.theme = colorSchemeQuery?.matches ? "amber-led" : "gray";
+
+try {
+  const storedPreference = typeof window === "undefined"
+    ? null
+    : window.localStorage.getItem(COLOR_SCHEME_STORAGE_KEY);
+  if (storedPreference === "light" || storedPreference === "dark") {
+    state.colorSchemePreference = storedPreference;
+  }
+} catch {
+  // Local storage can be unavailable in privacy-restricted browser contexts.
+}
+
+function applyColorScheme(preference: ColorSchemePreference, persist: boolean): void {
+  const dark = preference === "dark" ||
+    (preference === "system" && colorSchemeQuery?.matches === true);
+  state.colorSchemePreference = preference;
+  state.theme = dark ? "amber-led" : "gray";
+  document.documentElement.dataset.colorScheme = dark ? "dark" : "light";
+  for (const button of ui.colorSchemeControls.querySelectorAll<HTMLButtonElement>(
+    "button[data-color-scheme]",
+  )) {
+    button.setAttribute("aria-pressed", String(button.dataset.colorScheme === preference));
+  }
+  if (!persist || typeof window === "undefined") return;
+  try {
+    if (preference === "system") {
+      window.localStorage.removeItem(COLOR_SCHEME_STORAGE_KEY);
+    } else {
+      window.localStorage.setItem(COLOR_SCHEME_STORAGE_KEY, preference);
+    }
+  } catch {
+    // Keep the control functional even when local storage is unavailable.
+  }
+}
+
+applyColorScheme(state.colorSchemePreference, false);
 
 function chartConfig(): Config {
   const palette = chartPalettes[state.theme];
@@ -481,10 +521,29 @@ ui.rangeControls.addEventListener("click", (event) => {
   });
 });
 
-colorSchemeQuery?.addEventListener("change", (event) => {
-  const theme = event.matches ? "amber-led" : "gray";
-  if (theme === state.theme) return;
-  state.theme = theme;
+ui.colorSchemeControls.addEventListener("click", (event) => {
+  const button = (event.target as HTMLElement).closest<HTMLButtonElement>(
+    "button[data-color-scheme]",
+  );
+  const preference = button?.dataset.colorScheme;
+  if (
+    preference !== "system" &&
+    preference !== "light" &&
+    preference !== "dark"
+  ) return;
+  const previousTheme = state.theme;
+  applyColorScheme(preference, true);
+  if (state.theme === previousTheme) return;
+  void loadHistory().catch((error: unknown) => {
+    setError(error instanceof Error ? error.message : "History could not be loaded");
+  });
+});
+
+colorSchemeQuery?.addEventListener("change", () => {
+  if (state.colorSchemePreference !== "system") return;
+  const previousTheme = state.theme;
+  applyColorScheme("system", false);
+  if (state.theme === previousTheme) return;
   void loadHistory().catch((error: unknown) => {
     setError(error instanceof Error ? error.message : "History could not be loaded");
   });

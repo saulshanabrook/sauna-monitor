@@ -167,15 +167,24 @@ p { margin-top: 0; }
   font-size: clamp(1.3rem, 3vw, 1.9rem);
 }
 
-.range-controls {
+.range-controls,
+.color-scheme-controls {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 10px 18px;
+}
+
+.range-controls {
   margin-bottom: 48px;
 }
 
-.range-controls button {
+.color-scheme-controls {
+  margin-top: clamp(64px, 8vw, 96px);
+}
+
+.range-controls button,
+.color-scheme-controls button {
   padding: 3px 0;
   border: 0;
   color: var(--ink-dim);
@@ -185,43 +194,46 @@ p { margin-top: 0; }
 }
 
 .range-controls button:hover,
-.range-controls button[aria-pressed="true"] {
+.range-controls button[aria-pressed="true"],
+.color-scheme-controls button:hover,
+.color-scheme-controls button[aria-pressed="true"] {
   color: var(--ink-strong);
   text-decoration: underline;
   text-decoration-thickness: 2px;
   text-underline-offset: 5px;
 }
 
-.range-controls button:focus-visible {
+.range-controls button:focus-visible,
+.color-scheme-controls button:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 4px;
 }
 
 /* Amber display palette inspired by the Sony ICF-C1 clock radio. */
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --lcd: #030201;
-    --lcd-background: #030201;
-    --ink: #f7941d;
-    --ink-strong: #f7941d;
-    --ink-dim: #713907;
-    --focus: #ffb347;
-    --error: #ffb347;
-  }
+:root[data-color-scheme="dark"] {
+  color-scheme: dark;
+  --lcd: #030201;
+  --lcd-background: #030201;
+  --ink: #f7941d;
+  --ink-strong: #f7941d;
+  --ink-dim: #713907;
+  --focus: #ffb347;
+  --error: #ffb347;
+}
 
-  .metric-value {
-    text-shadow: 0 0 14px rgba(247, 148, 29, .58);
-  }
+:root[data-color-scheme="dark"] .metric-value {
+  text-shadow: 0 0 14px rgba(247, 148, 29, .58);
+}
 
-  .status-row:first-child .status-value {
-    text-shadow: 0 0 10px rgba(247, 148, 29, .44);
-  }
+:root[data-color-scheme="dark"] .status-row:first-child .status-value {
+  text-shadow: 0 0 10px rgba(247, 148, 29, .44);
+}
 
-  .range-controls button:hover,
-  .range-controls button[aria-pressed="true"] {
-    text-shadow: 0 0 8px rgba(247, 148, 29, .44);
-  }
+:root[data-color-scheme="dark"] .range-controls button:hover,
+:root[data-color-scheme="dark"] .range-controls button[aria-pressed="true"],
+:root[data-color-scheme="dark"] .color-scheme-controls button:hover,
+:root[data-color-scheme="dark"] .color-scheme-controls button[aria-pressed="true"] {
+  text-shadow: 0 0 8px rgba(247, 148, 29, .44);
 }
 
 .charts {
