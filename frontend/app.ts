@@ -3,7 +3,7 @@ import type { Config, TopLevelSpec } from "vega-lite";
 import { projectHeatStatus, type ReadingStatus } from "./heat-status";
 
 type Unit = "f" | "c";
-type DisplayTheme = "gray" | "red-led";
+type DisplayTheme = "gray" | "amber-led";
 
 interface Measurement {
   c: number | null;
@@ -97,13 +97,13 @@ const chartPalettes: Record<DisplayTheme, {
     line: "#0c1516",
     focus: "#2d3938",
   },
-  "red-led": {
-    domain: "#7a0d0d",
-    grid: "#280303",
-    ink: "#ff2424",
-    zero: "#7a0d0d",
-    line: "#ff2424",
-    focus: "#ff4a4a",
+  "amber-led": {
+    domain: "#713907",
+    grid: "#2b1705",
+    ink: "#f7941d",
+    zero: "#713907",
+    line: "#f7941d",
+    focus: "#ffb347",
   },
 };
 
@@ -122,7 +122,7 @@ ui.targetTemp.value = String(state.targetF);
 const colorSchemeQuery = typeof window === "undefined" || typeof window.matchMedia !== "function"
   ? null
   : window.matchMedia("(prefers-color-scheme: dark)");
-state.theme = colorSchemeQuery?.matches ? "red-led" : "gray";
+state.theme = colorSchemeQuery?.matches ? "amber-led" : "gray";
 
 function chartConfig(): Config {
   const palette = chartPalettes[state.theme];
@@ -482,7 +482,7 @@ ui.rangeControls.addEventListener("click", (event) => {
 });
 
 colorSchemeQuery?.addEventListener("change", (event) => {
-  const theme = event.matches ? "red-led" : "gray";
+  const theme = event.matches ? "amber-led" : "gray";
   if (theme === state.theme) return;
   state.theme = theme;
   void loadHistory().catch((error: unknown) => {

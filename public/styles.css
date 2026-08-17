@@ -188,28 +188,29 @@ p { margin-top: 0; }
   outline-offset: 4px;
 }
 
+/* Amber display palette inspired by the Sony ICF-C1 clock radio. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --lcd: #000;
-    --ink: #ff2424;
-    --ink-strong: #ff2424;
-    --ink-dim: #7a0d0d;
-    --focus: #ff4a4a;
-    --error: #ff4a4a;
+    --lcd: #030201;
+    --ink: #f7941d;
+    --ink-strong: #f7941d;
+    --ink-dim: #713907;
+    --focus: #ffb347;
+    --error: #ffb347;
   }
 
   .metric-value {
-    text-shadow: 0 0 14px rgba(255, 36, 36, .62);
+    text-shadow: 0 0 14px rgba(247, 148, 29, .58);
   }
 
   .status-row:first-child .status-value {
-    text-shadow: 0 0 10px rgba(255, 36, 36, .48);
+    text-shadow: 0 0 10px rgba(247, 148, 29, .44);
   }
 
   .range-controls button:hover,
   .range-controls button[aria-pressed="true"] {
-    text-shadow: 0 0 8px rgba(255, 36, 36, .48);
+    text-shadow: 0 0 8px rgba(247, 148, 29, .44);
   }
 }
 

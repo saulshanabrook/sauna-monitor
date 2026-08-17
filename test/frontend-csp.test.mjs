@@ -166,8 +166,11 @@ describe("frontend Content Security Policy", () => {
       renderer: "canvas",
       ast: true,
     });
-    expect(spec.config.axis.gridColor).toBe("#280303");
-    expect(spec.vconcat[0].layer[0].mark.color).toBe("#ff2424");
+    expect(spec.config.axis.gridColor).toBe("#2b1705");
+    expect(spec.config.axis.labelColor).toBe("#f7941d");
+    expect(spec.vconcat[0].layer[0].mark.color).toBe("#f7941d");
+    expect(spec.vconcat[0].layer.find((layer) => layer.mark?.type === "rule").mark.color)
+      .toBe("#ffb347");
     expect(chartCanvas.style.transformOrigin).toBe("top left");
     expect(chartCanvas.style.transform).toBe(`scale(${366 / 528})`);
     expect(Number.parseFloat(historyCharts.style.height)).toBeCloseTo(1_238 * 366 / 528);
@@ -300,6 +303,9 @@ describe("frontend Content Security Policy", () => {
     expect(html).not.toContain('id="theme-controls"');
     expect(html).not.toContain("data-theme=");
     expect(css).toContain("@media (prefers-color-scheme: dark)");
+    expect(css).toContain("--lcd: #030201");
+    expect(css).toContain("--ink: #f7941d");
+    expect(css).toContain("--focus: #ffb347");
     expect(html).not.toContain('<p class="instrument-label">Sauna air</p>');
     expect(html).not.toContain('class="current-grid"');
     expect(html).not.toContain('class="heat-summary"');
