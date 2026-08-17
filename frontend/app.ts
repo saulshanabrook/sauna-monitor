@@ -3,6 +3,7 @@ import type { Config, TopLevelSpec } from "vega-lite";
 import { projectHeatStatus, type ReadingStatus } from "./heat-status";
 
 type Unit = "f" | "c";
+type DisplayTheme = "gray" | "red-led";
 
 interface Measurement {
   c: number | null;
@@ -48,11 +49,13 @@ const state: {
   current: CurrentPayload | null;
   lastObservedAt: string | null;
   targetF: number;
+  theme: DisplayTheme;
 } = {
   range: "3h",
   current: null,
   lastObservedAt: null,
   targetF: 180,
+  theme: "gray",
 };
 
 function element<T extends HTMLElement>(id: string): T {
@@ -81,6 +84,32 @@ const TARGET_STORAGE_KEY = "sauna-time-target-f";
 const TARGET_MIN_F = 100;
 const TARGET_MAX_F = 220;
 
+const chartPalettes: Record<DisplayTheme, {
+  domain: string;
+  grid: string;
+  ink: string;
+  zero: string;
+  line: string;
+  focus: string;
+}> = {
+  gray: {
+    domain: "#737c76",
+    grid: "#adb5aa",
+    ink: "#1b2627",
+    zero: "#828b84",
+    line: "#0c1516",
+    focus: "#2d3938",
+  },
+  "red-led": {
+    domain: "#7a0d0d",
+    grid: "#280303",
+    ink: "#ff2424",
+    zero: "#7a0d0d",
+    line: "#ff2424",
+    focus: "#ff4a4a",
+  },
+};
+
 try {
   const storedTarget = typeof window === "undefined"
     ? Number.NaN
@@ -93,32 +122,40 @@ try {
 }
 ui.targetTemp.value = String(state.targetF);
 
-const chartConfig: Config = {
-  background: "transparent",
-  view: { stroke: null },
-  axis: {
-    domainColor: "#7a0d0d",
-    gridColor: "#280303",
-    labelColor: "#ff2424",
-    titleColor: "#ff2424",
-    tickColor: "#7a0d0d",
-    labelFont: "DSEG14",
-    titleFont: "DSEG14",
-    titleFontWeight: 700,
-  },
-  title: {
-    color: "#ff2424",
-    font: "DSEG14",
-    fontSize: 15,
-    fontWeight: 700,
-    anchor: "start",
-    offset: 14,
-  },
-  style: {
-    "guide-label": { font: "DSEG14" },
-    "guide-title": { font: "DSEG14" },
-  },
-};
+const colorSchemeQuery = typeof window === "undefined" || typeof window.matchMedia !== "function"
+  ? null
+  : window.matchMedia("(prefers-color-scheme: dark)");
+state.theme = colorSchemeQuery?.matches ? "red-led" : "gray";
+
+function chartConfig(): Config {
+  const palette = chartPalettes[state.theme];
+  return {
+    background: "transparent",
+    view: { stroke: null },
+    axis: {
+      domainColor: palette.domain,
+      gridColor: palette.grid,
+      labelColor: palette.ink,
+      titleColor: palette.ink,
+      tickColor: palette.domain,
+      labelFont: "DSEG14",
+      titleFont: "DSEG14",
+      titleFontWeight: 700,
+    },
+    title: {
+      color: palette.ink,
+      font: "DSEG14",
+      fontSize: 15,
+      fontWeight: 700,
+      anchor: "start",
+      offset: 14,
+    },
+    style: {
+      "guide-label": { font: "DSEG14" },
+      "guide-title": { font: "DSEG14" },
+    },
+  };
+}
 
 async function fetchJson<T>(url: string): Promise<T> {
   const response = await fetch(url, { headers: { Accept: "application/json" } });
@@ -206,6 +243,7 @@ interface LinkedChartOptions {
 type LinkedChartSpec = Extract<TopLevelSpec, { layer: unknown }>;
 
 function linkedChart(payload: HistoryPayload, options: LinkedChartOptions): LinkedChartSpec {
+  const palette = chartPalettes[state.theme];
   const temperature = options.kind === "temperature";
   const valueField = temperature ? "temp_max" : "rate_per_hour";
   const readoutField = temperature ? "temperature_readout" : "rate_readout";
@@ -228,14 +266,14 @@ function linkedChart(payload: HistoryPayload, options: LinkedChartOptions): Link
 
   if (!temperature) {
     layer.push({
-      mark: { type: "rule", color: "#7a0d0d", strokeDash: [5, 5] },
+      mark: { type: "rule", color: palette.zero, strokeDash: [5, 5] },
       encoding: { y: { datum: 0 } },
     });
   }
 
   layer.push(
     {
-      mark: { type: "line", color: "#ff2424", strokeWidth: 2.2, interpolate: "linear" },
+      mark: { type: "line", color: palette.line, strokeWidth: 2.2, interpolate: "linear" },
       encoding: { x, y, detail: { field: "segment" } },
     },
     {
@@ -254,11 +292,11 @@ function linkedChart(payload: HistoryPayload, options: LinkedChartOptions): Link
       encoding: { x },
     },
     {
-      mark: { type: "rule", color: "#ff4a4a", strokeWidth: 1.5 },
+      mark: { type: "rule", color: palette.focus, strokeWidth: 1.5 },
       encoding: { x, opacity: selectedOpacity },
     },
     {
-      mark: { type: "point", color: "#ff4a4a", filled: true, size: 60 },
+      mark: { type: "point", color: palette.focus, filled: true, size: 60 },
       encoding: { x, y, opacity: selectedOpacity },
     },
     {
@@ -266,7 +304,7 @@ function linkedChart(payload: HistoryPayload, options: LinkedChartOptions): Link
         type: "text",
         align: { expr: "datum.readout_align" },
         baseline: "top",
-        color: "#ff4a4a",
+        color: palette.focus,
         dx: { expr: "datum.readout_dx" },
         dy: 6,
         font: "DSEG14",
@@ -284,7 +322,7 @@ function linkedChart(payload: HistoryPayload, options: LinkedChartOptions): Link
         type: "text",
         align: { expr: "datum.readout_align" },
         baseline: "top",
-        color: "#ff4a4a",
+        color: palette.focus,
         dx: { expr: "datum.readout_dx" },
         dy: 25,
         font: "DSEG14",
@@ -422,7 +460,7 @@ async function loadHistory(): Promise<void> {
     ],
     spacing: 52,
     resolve: { scale: { x: "shared", y: "independent" } },
-    config: chartConfig,
+    config: chartConfig(),
   };
   const result = await embed(ui.historyCharts, spec, { actions: false, renderer: "canvas", ast: true });
   historyChartView = result.view;
@@ -446,6 +484,15 @@ ui.rangeControls.addEventListener("click", (event) => {
   for (const candidate of ui.rangeControls.querySelectorAll("button[data-range]")) {
     candidate.setAttribute("aria-pressed", String(candidate === button));
   }
+  void loadHistory().catch((error: unknown) => {
+    setError(error instanceof Error ? error.message : "History could not be loaded");
+  });
+});
+
+colorSchemeQuery?.addEventListener("change", (event) => {
+  const theme = event.matches ? "red-led" : "gray";
+  if (theme === state.theme) return;
+  state.theme = theme;
   void loadHistory().catch((error: unknown) => {
     setError(error instanceof Error ? error.message : "History could not be loaded");
   });

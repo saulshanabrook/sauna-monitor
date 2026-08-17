@@ -56,6 +56,11 @@ describe("frontend Content Security Policy", () => {
       observe() {}
     }
     vi.stubGlobal("ResizeObserver", FakeResizeObserver);
+    let colorSchemeChange;
+    const colorSchemeQuery = {
+      matches: true,
+      addEventListener: (_type, listener) => { colorSchemeChange = listener; },
+    };
     const elements = new Map();
     const fakeDocument = {
       body: new FakeElement(),
@@ -69,6 +74,15 @@ describe("frontend Content Security Policy", () => {
         return created;
       },
     };
+    vi.stubGlobal("window", {
+      addEventListener() {},
+      removeEventListener() {},
+      matchMedia: () => colorSchemeQuery,
+      localStorage: {
+        getItem: () => null,
+        setItem() {},
+      },
+    });
     const historyCharts = fakeDocument.getElementById("history-charts");
     const chartCanvas = new FakeElement();
     const chartView = {
@@ -152,6 +166,8 @@ describe("frontend Content Security Policy", () => {
       renderer: "canvas",
       ast: true,
     });
+    expect(spec.config.axis.gridColor).toBe("#280303");
+    expect(spec.vconcat[0].layer[0].mark.color).toBe("#ff2424");
     expect(chartCanvas.style.transformOrigin).toBe("top left");
     expect(chartCanvas.style.transform).toBe(`scale(${366 / 528})`);
     expect(Number.parseFloat(historyCharts.style.height)).toBeCloseTo(1_238 * 366 / 528);
@@ -254,10 +270,19 @@ describe("frontend Content Security Policy", () => {
       ["left", 10],
       ["right", -10],
     ]);
+
+    expect(colorSchemeChange).toBeTypeOf("function");
+    colorSchemeQuery.matches = false;
+    colorSchemeChange({ matches: false });
+    await vi.waitFor(() => expect(embed).toHaveBeenCalledTimes(2));
+    const lightSpec = embed.mock.calls[1][1];
+    expect(lightSpec.config.axis.gridColor).toBe("#adb5aa");
+    expect(lightSpec.vconcat[0].layer[0].mark.color).toBe("#0c1516");
   });
 
   it("keeps only the requested controls and separate sensor charts", () => {
     const html = readFileSync(new URL("../public/index.html", import.meta.url), "utf8");
+    const css = readFileSync(new URL("../public/styles.css", import.meta.url), "utf8");
     const ranges = [...html.matchAll(/data-range="([^"]+)"/g)].map((match) => match[1]);
 
     expect(html).toContain('id="history-charts"');
@@ -268,6 +293,9 @@ describe("frontend Content Security Policy", () => {
     expect(html).toContain('id="target-temp"');
     expect(html).toContain('value="180"');
     expect(html).toContain('id="heat-state"');
+    expect(html).not.toContain('id="theme-controls"');
+    expect(html).not.toContain("data-theme=");
+    expect(css).toContain("@media (prefers-color-scheme: dark)");
     expect(html).not.toContain('<p class="instrument-label">Sauna air</p>');
     expect(html).not.toContain('class="current-grid"');
     expect(html).not.toContain('class="heat-summary"');
