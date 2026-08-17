@@ -188,7 +188,7 @@ async function loadCurrent(): Promise<boolean> {
 }
 
 function timeAxisFormat(): string {
-  if (state.range === "3h" || state.range === "12h" || state.range === "24h") return "%I:%M %p";
+  if (["1h", "3h", "12h", "24h"].includes(state.range)) return "%I:%M %p";
   if (state.range === "7d") return "%a %m/%d";
   if (state.range === "30d") return "%b %d";
   return "%b %Y";

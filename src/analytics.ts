@@ -153,6 +153,7 @@ export function advanceDetector(
 }
 
 const RANGE_MILLISECONDS: Record<string, number | null> = {
+  "1h": 60 * 60_000,
   "3h": 3 * 60 * 60_000,
   "12h": 12 * 60 * 60_000,
   "24h": 24 * 60 * 60_000,
@@ -179,6 +180,7 @@ export function historyRange(value: string | null): { name: string; durationMs: 
 
 export function historyBucketMs(rangeName: string, spanMs: number, expectedIntervalMs: number): number {
   const prescribed: Record<string, number> = {
+    "1h": expectedIntervalMs,
     "3h": expectedIntervalMs,
     "12h": expectedIntervalMs,
     "24h": expectedIntervalMs,

@@ -68,6 +68,7 @@ describe("calculateRates", () => {
 
 describe("historyBucketMs", () => {
   it("keeps common views bounded", () => {
+    expect(historyBucketMs("1h", 60 * minute, 5 * minute)).toBe(5 * minute);
     expect(historyBucketMs("3h", 3 * 60 * minute, 5 * minute)).toBe(5 * minute);
     expect(historyBucketMs("12h", 12 * 60 * minute, 5 * minute)).toBe(5 * minute);
     expect(historyBucketMs("24h", 24 * 60 * minute, 5 * minute)).toBe(5 * minute);
@@ -75,6 +76,7 @@ describe("historyBucketMs", () => {
   });
 
   it("recognizes every dashboard range", () => {
+    expect(historyRange("1h")).toEqual({ name: "1h", durationMs: 60 * minute });
     expect(historyRange("3h")).toEqual({ name: "3h", durationMs: 3 * 60 * minute });
     expect(historyRange("12h")).toEqual({ name: "12h", durationMs: 12 * 60 * minute });
     expect(historyRange("24h")).toEqual({ name: "24h", durationMs: 24 * 60 * minute });

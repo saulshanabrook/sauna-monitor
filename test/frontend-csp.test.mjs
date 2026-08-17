@@ -271,7 +271,8 @@ describe("frontend Content Security Policy", () => {
     expect(html).not.toContain('<p class="instrument-label">Sauna air</p>');
     expect(html).not.toContain('class="current-grid"');
     expect(html).not.toContain('class="heat-summary"');
-    expect(ranges).toEqual(["3h", "12h", "24h", "7d", "30d", "all"]);
+    expect(ranges).toEqual(["1h", "3h", "12h", "24h", "7d", "30d", "all"]);
+    expect(html).toContain('data-range="1h" aria-pressed="false"');
     expect(html).toContain('data-range="3h" aria-pressed="true"');
     expect(html).toContain('data-range="24h" aria-pressed="false"');
     expect(html).not.toContain("<h1");
