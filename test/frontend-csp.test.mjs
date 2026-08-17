@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { View, Warn, logger, parse } from "vega";
@@ -352,9 +353,12 @@ describe("frontend Content Security Policy", () => {
     expect(html).toContain('id="color-scheme-controls"');
     expect(colorSchemes).toEqual(["system", "light", "dark"]);
     expect(html).toContain('data-color-scheme="system" aria-pressed="true"');
-    expect(html).toContain('<script src="/color-scheme.js"></script>');
-    expect(html.indexOf('<script src="/color-scheme.js"></script>'))
-      .toBeLessThan(html.indexOf('<link rel="stylesheet" href="/styles.css">'));
+    expect(html).toContain('<script id="color-scheme-bootstrap" src="/color-scheme.js"></script>');
+    expect(html).toContain('<link id="app-styles" rel="stylesheet" href="/styles.css">');
+    expect(html.indexOf('<script id="color-scheme-bootstrap" src="/color-scheme.js"></script>'))
+      .toBeLessThan(html.indexOf('<link id="app-styles" rel="stylesheet" href="/styles.css">'));
+    const bootstrapHash = createHash("sha256").update(colorSchemeScript).digest("base64");
+    expect(html).toContain(`script-src 'self' 'sha256-${bootstrapHash}'`);
     expect(colorSchemeScript).toContain('const storageKey = "sauna-time-color-scheme"');
     expect(colorSchemeScript).toContain("window.localStorage.getItem(storageKey)");
     expect(colorSchemeScript).toContain('window.matchMedia("(prefers-color-scheme: dark)")');

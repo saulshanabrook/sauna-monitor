@@ -6,19 +6,18 @@
     <meta name="color-scheme" content="light dark">
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self' 'sha256-GlnBVtZqfMMlFy6aI5ISCjoCyoQ1H+HRuuDDVh1MFBA='; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; font-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'none'"
     >
     <meta name="description" content="Live and historical sauna temperatures.">
     <title>Sauna Time</title>
-    <script src="/color-scheme.js"></script>
-    <link rel="stylesheet" href="/styles.css">
-    <script type="module" src="/app.js"></script>
+    <script id="color-scheme-bootstrap" src="/color-scheme.js"></script>
+    <link id="app-styles" rel="stylesheet" href="/styles.css">
   </head>
   <body>
     <main class="shell">
       <div id="error-banner" class="error-banner" role="alert" hidden></div>
 
-      <section class="instrument-ledger" aria-label="Current conditions">
+      <section id="instrument-ledger" class="instrument-ledger" aria-label="Current conditions">
         <div class="temperature-ledger">
           <div class="instrument-row">
             <p class="instrument-label">Air</p>
@@ -69,5 +68,6 @@
       </div>
     </main>
     <noscript>This dashboard requires JavaScript to render its charts.</noscript>
+    <script type="module" src="/app.js"></script>
   </body>
 </html>

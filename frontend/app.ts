@@ -1,5 +1,6 @@
 import embed, { type Result } from "vega-embed";
 import type { Config, TopLevelSpec } from "vega-lite";
+import { canApplyObservedAt } from "./current-reading";
 import { projectHeatStatus, type ReadingStatus } from "./heat-status";
 
 type Unit = "f" | "c";
@@ -68,6 +69,7 @@ function element<T extends HTMLElement>(id: string): T {
 
 const ui = {
   error: element("error-banner"),
+  instrumentLedger: element("instrument-ledger"),
   saunaTemp: element("sauna-temp"),
   pipeTemp: element("pipe-temp"),
   targetTemp: element<HTMLInputElement>("target-temp"),
@@ -80,6 +82,11 @@ const ui = {
   rangeControls: element("range-controls"),
   colorSchemeControls: element("color-scheme-controls"),
 };
+
+const initialObservedAt = ui.instrumentLedger.dataset.observedAt;
+if (initialObservedAt !== undefined && Number.isFinite(Date.parse(initialObservedAt))) {
+  state.lastObservedAt = initialObservedAt;
+}
 
 const TARGET_STORAGE_KEY = "sauna-time-target-f";
 const COLOR_SCHEME_STORAGE_KEY = "sauna-time-color-scheme";
@@ -248,9 +255,16 @@ function refreshCurrentDisplay(): void {
 
 async function loadCurrent(): Promise<boolean> {
   const payload = await fetchJson<CurrentPayload>("/api/current");
-  const changed = payload.current?.observed_at !== state.lastObservedAt;
+  const incomingObservedAt = payload.current?.observed_at ?? null;
+  if (!canApplyObservedAt(state.lastObservedAt, incomingObservedAt)) return false;
+  const changed = incomingObservedAt !== state.lastObservedAt;
   state.current = payload;
-  state.lastObservedAt = payload.current?.observed_at ?? null;
+  state.lastObservedAt = incomingObservedAt;
+  if (incomingObservedAt === null) {
+    delete ui.instrumentLedger.dataset.observedAt;
+  } else {
+    ui.instrumentLedger.dataset.observedAt = incomingObservedAt;
+  }
   document.title = payload.site_name;
   refreshCurrentDisplay();
   return changed;

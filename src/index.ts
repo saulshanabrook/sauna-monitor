@@ -2,6 +2,7 @@ import { currentResponse, historyResponse, sessionsResponse } from "./api";
 import { getRuntimeConfig, normalizeEui } from "./config";
 import { insertReading, processDerivedData } from "./db";
 import { parseTtsUplink } from "./domain";
+import { dashboardPage } from "./page";
 import type { Env } from "./types";
 
 class HttpError extends Error {
@@ -144,8 +145,21 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname.startsWith("/api/")) return await api(request, env, url);
+      if (
+        request.method === "GET" &&
+        (url.pathname === "/" || url.pathname === "/index.html")
+      ) {
+        return await dashboardPage(request, env);
+      }
       return env.ASSETS.fetch(request);
     } catch (error) {
+      if (!url.pathname.startsWith("/api/")) {
+        console.error(
+          "Dashboard page rendering failed",
+          error instanceof Error ? error.message : "unknown error",
+        );
+        return env.ASSETS.fetch(request);
+      }
       if (error instanceof HttpError) return json({ error: error.message }, error.status);
       console.error("Unhandled request failure", error instanceof Error ? error.message : "unknown error");
       return json({ error: "Internal server error" }, 500);
