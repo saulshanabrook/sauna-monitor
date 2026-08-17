@@ -18,6 +18,15 @@
 :root {
   color-scheme: light;
   --lcd: #cbd1c4;
+  --lcd-background: linear-gradient(
+    110deg,
+    #f5d9e4 0%,
+    #f8e3cf 20%,
+    #f4efce 40%,
+    #dcebd7 60%,
+    #d7e8ef 80%,
+    #e5dbf1 100%
+  );
   --ink: #1b2627;
   --ink-strong: #090d0e;
   --ink-dim: #59645f;
@@ -33,7 +42,7 @@ body {
   min-width: 320px;
   margin: 0;
   color: var(--ink);
-  background: var(--lcd);
+  background: var(--lcd-background, var(--lcd));
 }
 
 button { font: inherit; }
@@ -193,6 +202,7 @@ p { margin-top: 0; }
   :root {
     color-scheme: dark;
     --lcd: #030201;
+    --lcd-background: #030201;
     --ink: #f7941d;
     --ink-strong: #f7941d;
     --ink-dim: #713907;

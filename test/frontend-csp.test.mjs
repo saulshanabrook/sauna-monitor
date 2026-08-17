@@ -303,6 +303,10 @@ describe("frontend Content Security Policy", () => {
     expect(html).not.toContain('id="theme-controls"');
     expect(html).not.toContain("data-theme=");
     expect(css).toContain("@media (prefers-color-scheme: dark)");
+    expect(css).toContain("--lcd-background: linear-gradient(");
+    expect(css).toContain("#f5d9e4 0%");
+    expect(css).toContain("#e5dbf1 100%");
+    expect(css).toContain("--lcd-background: #030201");
     expect(css).toContain("--lcd: #030201");
     expect(css).toContain("--ink: #f7941d");
     expect(css).toContain("--focus: #ffb347");
