@@ -153,11 +153,11 @@ export function advanceDetector(
 }
 
 const RANGE_MILLISECONDS: Record<string, number | null> = {
+  "3h": 3 * 60 * 60_000,
+  "12h": 12 * 60 * 60_000,
   "24h": 24 * 60 * 60_000,
   "7d": 7 * 24 * 60 * 60_000,
   "30d": 30 * 24 * 60 * 60_000,
-  "90d": 90 * 24 * 60 * 60_000,
-  "1y": 365 * 24 * 60 * 60_000,
   all: null,
 };
 
@@ -179,11 +179,11 @@ export function historyRange(value: string | null): { name: string; durationMs: 
 
 export function historyBucketMs(rangeName: string, spanMs: number, expectedIntervalMs: number): number {
   const prescribed: Record<string, number> = {
+    "3h": expectedIntervalMs,
+    "12h": expectedIntervalMs,
     "24h": expectedIntervalMs,
     "7d": 15 * 60_000,
     "30d": 60 * 60_000,
-    "90d": 3 * 60 * 60_000,
-    "1y": 6 * 60 * 60_000,
   };
   if (rangeName !== "all") return Math.max(expectedIntervalMs, prescribed[rangeName] ?? expectedIntervalMs);
   const minimumBucket = Math.max(expectedIntervalMs, Math.ceil(spanMs / 1_500));

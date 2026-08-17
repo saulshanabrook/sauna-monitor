@@ -3,6 +3,13 @@
   "name": "sauna-monitor",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-04",
+  "workers_dev": true,
+  "routes": [
+    {
+      "pattern": "sauna.valleyhousing.coop",
+      "custom_domain": true
+    }
+  ],
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
@@ -11,16 +18,17 @@
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "sauna-monitor-db",
-      "migrations_dir": "migrations"
+      "database_name": "sauna-monitor-db-backfill-20260816T174947Z",
+      "migrations_dir": "migrations",
+      "database_id": "f54a2d9e-45c4-4c69-9080-28b2c50cc6c2"
     }
   ],
   "vars": {
     "EXPECTED_APPLICATION_ID": "sauna",
     "EXPECTED_DEV_EUI": "A84041A47C61C1E2",
     "WEBHOOK_USERNAME": "tts",
-    "SAUNA_CHANNEL": "1",
-    "STOVEPIPE_CHANNEL": "2",
+    "SAUNA_CHANNEL": "2",
+    "STOVEPIPE_CHANNEL": "1",
     "EXPECTED_INTERVAL_SECONDS": "300",
     "RATE_WINDOW_MINUTES": "15",
     "RATE_MIN_SPAN_MINUTES": "8",
@@ -28,7 +36,6 @@
     "SESSION_END_PIPE_C": "50",
     "SESSION_END_HOLD_MINUTES": "45",
     "REPORT_TIME_ZONE": "America/New_York",
-    "SITE_NAME": "Woodland Sauna"
+    "SITE_NAME": "Sauna Time"
   }
 }
-

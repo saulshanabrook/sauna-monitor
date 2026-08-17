@@ -60,6 +60,8 @@ export async function currentResponse(db: D1Database, config: RuntimeConfig): Pr
   if (!row) {
     return {
       site_name: config.siteName,
+      time_zone: config.reportTimeZone,
+      rate_window_minutes: config.rateWindowMinutes,
       current: null,
       status: "offline",
       expected_interval_seconds: config.expectedIntervalSeconds,
@@ -76,6 +78,8 @@ export async function currentResponse(db: D1Database, config: RuntimeConfig): Pr
       : "stale";
   return {
     site_name: config.siteName,
+    time_zone: config.reportTimeZone,
+    rate_window_minutes: config.rateWindowMinutes,
     status,
     expected_interval_seconds: config.expectedIntervalSeconds,
     stale_after_seconds: config.staleAfterSeconds,
@@ -270,4 +274,3 @@ export async function sessionsResponse(
     months: summarizeSessions(rows, count, config.reportTimeZone),
   };
 }
-

@@ -3,6 +3,7 @@ import {
   calculateRates,
   celsiusRateToFahrenheit,
   historyBucketMs,
+  historyRange,
   linearRegressionRate,
 } from "../src/analytics";
 
@@ -67,9 +68,18 @@ describe("calculateRates", () => {
 
 describe("historyBucketMs", () => {
   it("keeps common views bounded", () => {
+    expect(historyBucketMs("3h", 3 * 60 * minute, 5 * minute)).toBe(5 * minute);
+    expect(historyBucketMs("12h", 12 * 60 * minute, 5 * minute)).toBe(5 * minute);
     expect(historyBucketMs("24h", 24 * 60 * minute, 5 * minute)).toBe(5 * minute);
     expect(historyBucketMs("30d", 30 * 24 * 60 * minute, 5 * minute)).toBe(60 * minute);
-    expect(historyBucketMs("1y", 365 * 24 * 60 * minute, 5 * minute)).toBe(6 * 60 * minute);
+  });
+
+  it("recognizes every dashboard range", () => {
+    expect(historyRange("3h")).toEqual({ name: "3h", durationMs: 3 * 60 * minute });
+    expect(historyRange("12h")).toEqual({ name: "12h", durationMs: 12 * 60 * minute });
+    expect(historyRange("24h")).toEqual({ name: "24h", durationMs: 24 * 60 * minute });
+    expect(historyRange("7d")).toEqual({ name: "7d", durationMs: 7 * 24 * 60 * minute });
+    expect(historyRange("30d")).toEqual({ name: "30d", durationMs: 30 * 24 * 60 * minute });
+    expect(historyRange("all")).toEqual({ name: "all", durationMs: null });
   });
 });
-

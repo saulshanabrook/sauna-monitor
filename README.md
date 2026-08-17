@@ -57,14 +57,14 @@ https://sauna-monitor.<your-workers-subdomain>.workers.dev
 
 ### Confirm the channel mapping
 
-The supplied configuration assumes:
+The deployed configuration, confirmed against live decoded values, uses:
 
 ```text
-Temp_Channel1 → sauna air
-Temp_Channel2 → stovepipe
+Temp_Channel1 → stovepipe
+Temp_Channel2 → sauna air
 ```
 
-Before relying on the labels, warm one probe by hand and watch the decoded TTS values. If Channel 2 is the sauna-air probe, swap these values in `wrangler.jsonc` and redeploy:
+If the probes are rewired, warm one probe by hand and watch the decoded TTS values. Update these values in `wrangler.jsonc` and redeploy if the mapping changes:
 
 ```json
 "SAUNA_CHANNEL": "2",
@@ -111,6 +111,52 @@ Run all checks with:
 ```bash
 npm run check
 ```
+
+### Audit a TTS Storage export
+
+The one-time storage importer is dry-run-only unless `--replay` is explicitly supplied. It reads one
+`{"result": ...}` event per nonblank NDJSON line, validates the fixed application, device EUI, timestamp
+bounds, probe mapping, temperature ranges, message identity, physical-packet identity, and timestamp
+ordering, then writes an audit manifest and an oldest-first, one-envelope-per-line replay file.
+
+```bash
+npm run backfill:audit -- \
+  --input-dir /path/to/pages \
+  --manifest /path/to/audit-manifest.json \
+  --replay-output /path/to/oldest-first.ndjson \
+  --after 1970-01-01T00:00:00Z \
+  --before 2026-08-16T17:31:00Z \
+  --expected-count 3210
+```
+
+The bounds are exclusive and should match the fixed Storage Integration query. Compare
+`--expected-count` with the Storage Integration count endpoint. Do not use shell-expanded secrets or
+put credentials in command arguments.
+
+For a replay into a database that already contains readings, export the live raw identity columns and
+pass them with `--live-baseline /path/to/live-readings.json`. The file may be a JSON row array or
+Wrangler's JSON result containing `results` arrays. Include these columns:
+
+```sql
+SELECT
+  message_key, application_id, device_id, dev_eui, received_at, frame_counter,
+  temp_channel_1_c, temp_channel_2_c
+FROM readings;
+```
+
+Storage exports can omit correlation and session IDs even when the live webhook supplied them. The
+audit therefore reconciles a live/archive overlap by DevEUI, device, the exact `received_at` string,
+frame counter, and equal raw channel values; it preserves the live representation and removes the
+archive representation from replay output. Frame counter alone is explicitly not a deduplication key,
+because counters can reset. A clean staging replay may omit the baseline and retain archive fallback
+keys. If a staging build also imports the live baseline, load each reported overlap only once.
+
+Live replay additionally requires `--live-baseline`, `--replay --acknowledge-derived-state-limitations`, and the environment
+variables `SAUNA_BACKFILL_INGEST_URL`, `SAUNA_BACKFILL_USERNAME`, and either
+`SAUNA_BACKFILL_PASSWORD` or `SAUNA_BACKFILL_PASSWORD_FD`. Requests are sent sequentially. The
+acknowledgement is required because the current Worker does not rebuild rates or session state for rows
+that are already present or older than its detector state; prefer a fresh database or a complete derived
+state rebuild when those analytics must remain authoritative.
 
 ## Public APIs
 
@@ -174,4 +220,3 @@ A scheduled D1-to-R2 backup can be added later without changing the ingestion or
 ## Safety
 
 This dashboard, its session detector, and its rate calculations are informational. Packet loss, battery failure, internet failure, gateway failure, configuration errors, or delayed readings can make it stale or incorrect. Do not use it as the stovepipe overfire alarm; keep that alarm local and independent.
-

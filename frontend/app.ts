@@ -1,8 +1,8 @@
-import embed, { type VisualizationSpec } from "vega-embed";
-import type { Config } from "vega-lite";
+import embed, { type Result } from "vega-embed";
+import type { Config, TopLevelSpec } from "vega-lite";
+import { projectHeatStatus, type ReadingStatus } from "./heat-status";
 
 type Unit = "f" | "c";
-type Status = "live" | "delayed" | "stale" | "offline";
 
 interface Measurement {
   c: number | null;
@@ -13,17 +13,14 @@ interface Measurement {
 
 interface CurrentPayload {
   site_name: string;
-  status: Status;
-  expected_interval_seconds: number;
-  stale_after_seconds: number;
+  time_zone: string;
+  rate_window_minutes: number;
+  status: ReadingStatus;
   session_active: boolean;
   current: null | {
     observed_at: string;
-    age_seconds: number;
     sauna: Measurement;
     stovepipe: Measurement;
-    battery_v: number | null;
-    signal: { rssi_dbm: number | null; snr_db: number | null };
   };
 }
 
@@ -46,32 +43,16 @@ interface HistoryPayload {
   points: HistoryPoint[];
 }
 
-interface MonthSummary {
-  month: string;
-  label: string;
-  sessions: number;
-  total_hours: number;
-  average_duration_minutes: number | null;
-  partial: boolean;
-  complete_sessions: number;
-}
-
-interface SessionsPayload {
-  timezone: string;
-  active: boolean;
-  months: MonthSummary[];
-}
-
 const state: {
-  unit: Unit;
   range: string;
   current: CurrentPayload | null;
   lastObservedAt: string | null;
+  targetF: number;
 } = {
-  unit: "f",
-  range: "24h",
+  range: "3h",
   current: null,
   lastObservedAt: null,
+  targetF: 180,
 };
 
 function element<T extends HTMLElement>(id: string): T {
@@ -81,54 +62,62 @@ function element<T extends HTMLElement>(id: string): T {
 }
 
 const ui = {
-  siteName: element("site-name"),
-  statusBadge: element("status-badge"),
-  statusText: element("status-text"),
-  unitSelect: element<HTMLSelectElement>("unit-select"),
   error: element("error-banner"),
   saunaTemp: element("sauna-temp"),
-  saunaUnit: element("sauna-unit"),
-  saunaRate: element("sauna-rate"),
   pipeTemp: element("pipe-temp"),
-  pipeUnit: element("pipe-unit"),
-  pipeRate: element("pipe-rate"),
-  heatingRate: element("heating-rate"),
-  sessionState: element("session-state"),
-  lastUpdated: element("last-updated"),
-  battery: element("battery"),
-  temperatureChart: element("temperature-chart"),
-  rateChart: element("rate-chart"),
-  sessionsChart: element("sessions-chart"),
-  sessionSummary: element("session-summary"),
+  targetTemp: element<HTMLInputElement>("target-temp"),
+  heatStateLabel: element("heat-state-label"),
+  heatState: element("heat-state"),
+  heatDetailRow: element("heat-detail-row"),
+  heatDetailLabel: element("heat-detail-label"),
+  heatDetail: element("heat-detail"),
+  heatBasisRow: element("heat-basis-row"),
+  heatBasis: element("heat-basis"),
+  historyCharts: element("history-charts"),
   rangeControls: element("range-controls"),
 };
+
+const TARGET_STORAGE_KEY = "sauna-time-target-f";
+const TARGET_MIN_F = 100;
+const TARGET_MAX_F = 220;
+
+try {
+  const storedTarget = typeof window === "undefined"
+    ? Number.NaN
+    : Number(window.localStorage.getItem(TARGET_STORAGE_KEY));
+  if (Number.isFinite(storedTarget) && storedTarget >= TARGET_MIN_F && storedTarget <= TARGET_MAX_F) {
+    state.targetF = storedTarget;
+  }
+} catch {
+  // Local storage can be unavailable in privacy-restricted browser contexts.
+}
+ui.targetTemp.value = String(state.targetF);
 
 const chartConfig: Config = {
   background: "transparent",
   view: { stroke: null },
   axis: {
-    domainColor: "#6f6257",
-    gridColor: "#443a32",
-    labelColor: "#bcae9f",
-    titleColor: "#d9cec2",
-    tickColor: "#6f6257",
-    labelFont: "system-ui",
-    titleFont: "system-ui",
-    titleFontWeight: 600,
+    domainColor: "#7a0d0d",
+    gridColor: "#280303",
+    labelColor: "#ff2424",
+    titleColor: "#ff2424",
+    tickColor: "#7a0d0d",
+    labelFont: "DSEG14",
+    titleFont: "DSEG14",
+    titleFontWeight: 700,
   },
-  legend: {
-    labelColor: "#d9cec2",
-    labelFont: "system-ui",
-    orient: "top",
-    direction: "horizontal",
-    title: null,
+  title: {
+    color: "#ff2424",
+    font: "DSEG14",
+    fontSize: 15,
+    fontWeight: 700,
+    anchor: "start",
+    offset: 14,
   },
-  style: { "guide-label": { font: "system-ui" }, "guide-title": { font: "system-ui" } },
-};
-
-const seriesScale = {
-  domain: ["Sauna air", "Stovepipe"],
-  range: ["#f3b562", "#ee6c4d"],
+  style: {
+    "guide-label": { font: "DSEG14" },
+    "guide-title": { font: "DSEG14" },
+  },
 };
 
 async function fetchJson<T>(url: string): Promise<T> {
@@ -146,65 +135,46 @@ function formatNumber(value: number | null, digits = 1): string {
   return value === null || !Number.isFinite(value) ? "—" : value.toFixed(digits);
 }
 
-function formatAge(seconds: number): string {
-  if (seconds < 60) return `${seconds} seconds ago`;
-  if (seconds < 3_600) return `${Math.floor(seconds / 60)} minutes ago`;
-  if (seconds < 86_400) return `${Math.floor(seconds / 3_600)} hours ago`;
-  return `${Math.floor(seconds / 86_400)} days ago`;
-}
-
-function displayedMeasurement(measurement: Measurement): { temp: number | null; rate: number | null } {
-  return state.unit === "f"
-    ? { temp: measurement.f, rate: measurement.rate_f_per_min }
-    : { temp: measurement.c, rate: measurement.rate_c_per_min };
-}
-
-function statusForAge(ageSeconds: number, current: CurrentPayload): Status {
-  if (ageSeconds <= current.expected_interval_seconds * 2) return "live";
-  if (ageSeconds <= current.stale_after_seconds) return "delayed";
-  return "stale";
+function refreshHeatDisplay(): void {
+  const payload = state.current;
+  const projection = projectHeatStatus({
+    currentF: payload?.current?.sauna.f ?? null,
+    observedAtMs: payload?.current ? Date.parse(payload.current.observed_at) : Number.NaN,
+    nowMs: Date.now(),
+    rateFPerMin: payload?.current?.sauna.rate_f_per_min ?? null,
+    sessionActive: payload?.session_active ?? false,
+    sourceStatus: payload?.status ?? "offline",
+    targetF: state.targetF,
+    timeZone: payload?.time_zone ?? "America/New_York",
+  });
+  const showingEta = projection.state === "eta";
+  ui.heatStateLabel.textContent = showingEta ? "HOT IN" : "STATUS";
+  ui.heatState.textContent = projection.headline;
+  ui.heatState.dataset.state = projection.state;
+  ui.heatDetailLabel.textContent = showingEta ? "ESTIMATED HOT" : "ESTIMATE";
+  ui.heatDetail.textContent = projection.detail;
+  ui.heatDetailRow.hidden = projection.detail.length === 0;
+  const showBasis = projection.state === "eta" && Number.isFinite(payload?.rate_window_minutes);
+  ui.heatBasis.textContent = showBasis
+    ? `LAST ${payload?.rate_window_minutes} MINUTES`
+    : "";
+  ui.heatBasisRow.hidden = !showBasis;
 }
 
 function refreshCurrentDisplay(): void {
   const payload = state.current;
-  const unitLabel = state.unit === "f" ? "°F" : "°C";
-  const rateLabel = state.unit === "f" ? "°F/min" : "°C/min";
-  ui.saunaUnit.textContent = unitLabel;
-  ui.pipeUnit.textContent = unitLabel;
   if (!payload?.current) {
-    ui.statusBadge.className = "status-badge status-offline";
-    ui.statusText.textContent = "Waiting for data";
     ui.saunaTemp.textContent = "—";
     ui.pipeTemp.textContent = "—";
-    ui.heatingRate.textContent = "—";
+    refreshHeatDisplay();
     return;
   }
 
-  const ageSeconds = Math.max(0, Math.floor((Date.now() - Date.parse(payload.current.observed_at)) / 1_000));
-  const status = statusForAge(ageSeconds, payload);
-  const statusLabel = status === "live" ? "Live" : status === "delayed" ? "Delayed" : "Stale";
-  ui.statusBadge.className = `status-badge status-${status}`;
-  ui.statusText.textContent = `${statusLabel} · ${formatAge(ageSeconds)}`;
-  document.body.classList.toggle("is-stale", status === "stale");
-
-  const sauna = displayedMeasurement(payload.current.sauna);
-  const pipe = displayedMeasurement(payload.current.stovepipe);
-  ui.saunaTemp.textContent = formatNumber(sauna.temp, 1);
-  ui.pipeTemp.textContent = formatNumber(pipe.temp, 1);
-  ui.saunaRate.textContent = sauna.rate === null
-    ? "Collecting 15-minute trend…"
-    : `${sauna.rate >= 0 ? "+" : ""}${formatNumber(sauna.rate, 2)} ${rateLabel}`;
-  ui.pipeRate.textContent = pipe.rate === null
-    ? "Collecting 15-minute trend…"
-    : `${pipe.rate >= 0 ? "+" : ""}${formatNumber(pipe.rate, 2)} ${rateLabel}`;
-  ui.heatingRate.textContent = pipe.rate === null
-    ? "Collecting…"
-    : `${pipe.rate >= 0 ? "+" : ""}${formatNumber(pipe.rate, 2)} ${rateLabel}`;
-  ui.sessionState.textContent = payload.session_active
-    ? "Sauna heating session active"
-    : "No active heating session";
-  ui.lastUpdated.textContent = `Last reading ${formatAge(ageSeconds)}`;
-  ui.battery.textContent = `Battery ${formatNumber(payload.current.battery_v, 2)} V`;
+  const sauna = payload.current.sauna;
+  const pipe = payload.current.stovepipe;
+  ui.saunaTemp.textContent = formatNumber(sauna.f, 0);
+  ui.pipeTemp.textContent = formatNumber(pipe.f, 0);
+  refreshHeatDisplay();
 }
 
 async function loadCurrent(): Promise<boolean> {
@@ -212,169 +182,262 @@ async function loadCurrent(): Promise<boolean> {
   const changed = payload.current?.observed_at !== state.lastObservedAt;
   state.current = payload;
   state.lastObservedAt = payload.current?.observed_at ?? null;
-  ui.siteName.textContent = payload.site_name;
   document.title = payload.site_name;
   refreshCurrentDisplay();
   return changed;
 }
 
 function timeAxisFormat(): string {
-  if (state.range === "24h") return "%a %I:%M %p";
+  if (state.range === "3h" || state.range === "12h" || state.range === "24h") return "%I:%M %p";
   if (state.range === "7d") return "%a %m/%d";
-  if (state.range === "30d" || state.range === "90d") return "%b %d";
+  if (state.range === "30d") return "%b %d";
   return "%b %Y";
 }
 
-function emptyChart(target: HTMLElement, message: string): void {
-  target.replaceChildren();
-  target.classList.add("chart-empty");
-  const paragraph = document.createElement("p");
-  paragraph.textContent = message;
-  target.append(paragraph);
+const LINKED_HOVER = "linked_hover";
+
+interface LinkedChartOptions {
+  title: string;
+  series: HistoryPoint["series"];
+  kind: "temperature" | "change";
+  height: number;
 }
 
-async function renderTemperatureChart(payload: HistoryPayload): Promise<void> {
-  if (payload.points.length === 0) {
-    emptyChart(ui.temperatureChart, "No temperature history yet");
-    return;
-  }
-  ui.temperatureChart.classList.remove("chart-empty");
-  const spec: VisualizationSpec = {
-    $schema: "https://vega.github.io/schema/vega-lite/v6.json",
-    width: "container",
-    height: 300,
-    autosize: { type: "fit", contains: "padding", resize: true },
-    data: { values: payload.points },
-    layer: [
-      {
-        mark: { type: "area", opacity: 0.12 },
-        encoding: {
-          x: { field: "ts", type: "temporal", axis: { title: null, format: timeAxisFormat(), labelOverlap: true } },
-          y: { field: "temp_min", type: "quantitative", title: `Temperature (${payload.temperature_unit})`, scale: { zero: false } },
-          y2: { field: "temp_max" },
-          color: { field: "series", type: "nominal", scale: seriesScale },
-          detail: [{ field: "series" }, { field: "segment" }],
-        },
-      },
-      {
-        mark: { type: "line", strokeWidth: 2.4, interpolate: "linear" },
-        encoding: {
-          x: { field: "ts", type: "temporal", axis: { title: null, format: timeAxisFormat(), labelOverlap: true } },
-          y: { field: "temp", type: "quantitative", title: `Temperature (${payload.temperature_unit})`, scale: { zero: false } },
-          color: { field: "series", type: "nominal", scale: seriesScale },
-          detail: [{ field: "series" }, { field: "segment" }],
-          tooltip: [
-            { field: "ts", type: "temporal", title: "Time", format: "%b %d, %Y %I:%M %p" },
-            { field: "series", type: "nominal", title: "Sensor" },
-            { field: "temp", type: "quantitative", title: payload.temperature_unit, format: ".1f" },
-            { field: "temp_min", type: "quantitative", title: "Minimum", format: ".1f" },
-            { field: "temp_max", type: "quantitative", title: "Maximum", format: ".1f" },
-          ],
-        },
-      },
-    ],
-    config: chartConfig,
+type LinkedChartSpec = Extract<TopLevelSpec, { layer: unknown }>;
+
+function linkedChart(payload: HistoryPayload, options: LinkedChartOptions): LinkedChartSpec {
+  const temperature = options.kind === "temperature";
+  const valueField = temperature ? "temp_max" : "rate_per_hour";
+  const readoutField = temperature ? "temperature_readout" : "rate_readout";
+  const x = {
+    field: "ts",
+    type: "temporal" as const,
+    axis: { title: null, format: timeAxisFormat(), labelOverlap: true },
   };
-  await embed(ui.temperatureChart, spec, { actions: false, renderer: "canvas" });
+  const y = {
+    field: valueField,
+    type: "quantitative" as const,
+    title: temperature ? `Temperature (${payload.temperature_unit})` : "Change (°F/hour)",
+    scale: { zero: !temperature, padding: 18 },
+  };
+  const selectedOpacity = {
+    condition: { param: LINKED_HOVER, empty: false, value: 1 },
+    value: 0,
+  } as const;
+  const layer: LinkedChartSpec["layer"] = [];
+
+  if (!temperature) {
+    layer.push({
+      mark: { type: "rule", color: "#7a0d0d", strokeDash: [5, 5] },
+      encoding: { y: { datum: 0 } },
+    });
+  }
+
+  layer.push(
+    {
+      mark: { type: "line", color: "#ff2424", strokeWidth: 2.2, interpolate: "linear" },
+      encoding: { x, y, detail: { field: "segment" } },
+    },
+    {
+      params: [{
+        name: LINKED_HOVER,
+        select: {
+          type: "point",
+          fields: ["ts"],
+          on: "mousemove, click",
+          nearest: true,
+          clear: false,
+          toggle: false,
+        },
+      }],
+      mark: { type: "point", opacity: 0, size: 90 },
+      encoding: { x },
+    },
+    {
+      mark: { type: "rule", color: "#ff4a4a", strokeWidth: 1.5 },
+      encoding: { x, opacity: selectedOpacity },
+    },
+    {
+      mark: { type: "point", color: "#ff4a4a", filled: true, size: 60 },
+      encoding: { x, y, opacity: selectedOpacity },
+    },
+    {
+      mark: {
+        type: "text",
+        align: { expr: "datum.readout_align" },
+        baseline: "top",
+        color: "#ff4a4a",
+        dx: { expr: "datum.readout_dx" },
+        dy: 6,
+        font: "DSEG14",
+        fontSize: 13,
+      },
+      encoding: {
+        x,
+        y: { value: 0 },
+        text: { field: "ts", type: "temporal", format: "%b %d, %Y %I:%M %p" },
+        opacity: selectedOpacity,
+      },
+    },
+    {
+      mark: {
+        type: "text",
+        align: { expr: "datum.readout_align" },
+        baseline: "top",
+        color: "#ff4a4a",
+        dx: { expr: "datum.readout_dx" },
+        dy: 25,
+        font: "DSEG14",
+        fontSize: 15,
+        fontWeight: 700,
+      },
+      encoding: {
+        x,
+        y: { value: 0 },
+        text: { field: readoutField, type: "nominal" },
+        opacity: selectedOpacity,
+      },
+    },
+  );
+
+  return {
+    title: options.title,
+    width: "container",
+    height: options.height,
+    transform: [
+      { filter: { field: "series", equal: options.series } },
+      ...(!temperature ? [{ filter: "isValid(datum.rate_per_hour)" }] : []),
+    ],
+    layer,
+  };
 }
 
-async function renderRateChart(payload: HistoryPayload): Promise<void> {
-  const rated = payload.points.filter((point) => point.rate !== null);
-  if (rated.length === 0) {
-    emptyChart(ui.rateChart, "Three readings over at least eight minutes are needed to calculate a trend");
-    return;
-  }
-  ui.rateChart.classList.remove("chart-empty");
-  const spec: VisualizationSpec = {
-    $schema: "https://vega.github.io/schema/vega-lite/v6.json",
-    width: "container",
-    height: 220,
-    autosize: { type: "fit", contains: "padding", resize: true },
-    data: { values: rated },
-    layer: [
-      {
-        mark: { type: "rule", color: "#74675c", strokeDash: [5, 5] },
-        encoding: { y: { datum: 0 } },
-      },
-      {
-        mark: { type: "line", strokeWidth: 2.2, interpolate: "linear" },
-        encoding: {
-          x: { field: "ts", type: "temporal", axis: { title: null, format: timeAxisFormat(), labelOverlap: true } },
-          y: { field: "rate", type: "quantitative", title: `15-minute trend (${payload.rate_unit})` },
-          color: { field: "series", type: "nominal", scale: seriesScale, legend: null },
-          detail: [{ field: "series" }, { field: "segment" }],
-          tooltip: [
-            { field: "ts", type: "temporal", title: "Time", format: "%b %d, %Y %I:%M %p" },
-            { field: "series", type: "nominal", title: "Sensor" },
-            { field: "rate", type: "quantitative", title: payload.rate_unit, format: "+.2f" },
-          ],
-        },
-      },
-    ],
-    config: chartConfig,
-  };
-  await embed(ui.rateChart, spec, { actions: false, renderer: "canvas" });
+let fittedChartContainerWidth: number | null = null;
+let historyChartView: Result["view"] | null = null;
+
+function fitChartCanvas(force = false): void {
+  const canvas = ui.historyCharts.querySelector<HTMLCanvasElement>("canvas");
+  if (
+    !canvas ||
+    canvas.offsetWidth <= 0 ||
+    canvas.offsetHeight <= 0 ||
+    ui.historyCharts.clientWidth <= 0
+  ) return;
+
+  const containerWidth = ui.historyCharts.clientWidth;
+  if (!force && fittedChartContainerWidth === containerWidth) return;
+
+  const scale = Math.min(1, containerWidth / canvas.offsetWidth);
+  canvas.style.transformOrigin = "top left";
+  canvas.style.transform = `scale(${scale})`;
+  ui.historyCharts.style.height = `${canvas.offsetHeight * scale}px`;
+  fittedChartContainerWidth = containerWidth;
 }
+
+const chartResizeObserver = typeof ResizeObserver === "undefined"
+  ? null
+  : new ResizeObserver(() => {
+    if (
+      ui.historyCharts.clientWidth <= 0 ||
+      fittedChartContainerWidth === ui.historyCharts.clientWidth
+    ) return;
+
+    const view = historyChartView;
+    if (!view) {
+      fitChartCanvas();
+      return;
+    }
+    void view.resize().runAsync().then(
+      () => {
+        if (view === historyChartView) fitChartCanvas(true);
+      },
+      () => {
+        if (view === historyChartView) fitChartCanvas(true);
+      },
+    );
+  });
+chartResizeObserver?.observe(ui.historyCharts);
 
 async function loadHistory(): Promise<void> {
   const payload = await fetchJson<HistoryPayload>(
-    `/api/history?range=${encodeURIComponent(state.range)}&unit=${state.unit}`,
+    `/api/history?range=${encodeURIComponent(state.range)}&unit=f`,
   );
-  await Promise.all([renderTemperatureChart(payload), renderRateChart(payload)]);
-}
-
-async function loadSessions(): Promise<void> {
-  const payload = await fetchJson<SessionsPayload>("/api/sessions?months=12");
-  const total = payload.months.reduce((sum, month) => sum + month.sessions, 0);
-  ui.sessionSummary.textContent = `${total} session${total === 1 ? "" : "s"} in the last 12 calendar months`;
-  if (payload.months.every((month) => month.sessions === 0)) {
-    emptyChart(ui.sessionsChart, "No inferred sauna sessions yet");
+  if (payload.points.length === 0) {
+    ui.historyCharts.textContent = "No history yet";
+    ui.historyCharts.classList.add("chart-empty");
     return;
   }
-  ui.sessionsChart.classList.remove("chart-empty");
-  const spec: VisualizationSpec = {
+
+  ui.historyCharts.classList.remove("chart-empty");
+  const timestamps = payload.points
+    .map((point) => Date.parse(point.ts))
+    .filter(Number.isFinite);
+  const firstTimestamp = Math.min(...timestamps);
+  const lastTimestamp = Math.max(...timestamps);
+  const readoutFlipTimestamp = firstTimestamp + (lastTimestamp - firstTimestamp) * 0.72;
+  const values = payload.points.map((point) => {
+    const ratePerHour = point.rate === null ? null : point.rate * 60;
+    const readoutOnLeft = lastTimestamp > firstTimestamp && Date.parse(point.ts) >= readoutFlipTimestamp;
+    return {
+      ...point,
+      rate_per_hour: ratePerHour,
+      readout_align: readoutOnLeft ? "right" : "left",
+      readout_dx: readoutOnLeft ? -10 : 10,
+      temperature_readout: point.temp_min === point.temp_max
+        ? `${point.temp_max.toFixed(1)} ${payload.temperature_unit}`
+        : `${point.temp_min.toFixed(1)}–${point.temp_max.toFixed(1)} ${payload.temperature_unit}`,
+      rate_readout: ratePerHour === null
+        ? null
+        : `${ratePerHour > 0 ? "+" : ""}${ratePerHour.toFixed(1)} °F/hour`,
+    };
+  });
+  const spec: TopLevelSpec = {
     $schema: "https://vega.github.io/schema/vega-lite/v6.json",
-    width: "container",
-    height: 220,
-    autosize: { type: "fit", contains: "padding", resize: true },
-    data: { values: payload.months },
-    mark: { type: "bar", cornerRadiusTopLeft: 4, cornerRadiusTopRight: 4 },
-    encoding: {
-      x: { field: "label", type: "ordinal", sort: { field: "month" }, axis: { title: null, labelAngle: -35 } },
-      y: { field: "sessions", type: "quantitative", title: "Sessions", axis: { tickMinStep: 1 } },
-      color: {
-        condition: { test: "datum.partial", value: "#8a7060" },
-        value: "#f3b562",
-        legend: null,
-      },
-      tooltip: [
-        { field: "label", type: "nominal", title: "Month" },
-        { field: "sessions", type: "quantitative", title: "Sessions" },
-        { field: "total_hours", type: "quantitative", title: "Inferred hours", format: ".1f" },
-        { field: "average_duration_minutes", type: "quantitative", title: "Average minutes", format: ".0f" },
-      ],
-    },
+    data: { values },
+    vconcat: [
+      linkedChart(payload, {
+        title: "Air",
+        series: "Sauna air",
+        kind: "temperature",
+        height: 260,
+      }),
+      linkedChart(payload, {
+        title: "Air change",
+        series: "Sauna air",
+        kind: "change",
+        height: 180,
+      }),
+      linkedChart(payload, {
+        title: "Stovepipe",
+        series: "Stovepipe",
+        kind: "temperature",
+        height: 260,
+      }),
+      linkedChart(payload, {
+        title: "Stovepipe change",
+        series: "Stovepipe",
+        kind: "change",
+        height: 180,
+      }),
+    ],
+    spacing: 52,
+    resolve: { scale: { x: "shared", y: "independent" } },
     config: chartConfig,
   };
-  await embed(ui.sessionsChart, spec, { actions: false, renderer: "canvas" });
+  const result = await embed(ui.historyCharts, spec, { actions: false, renderer: "canvas", ast: true });
+  historyChartView = result.view;
+  fitChartCanvas(true);
 }
 
 async function loadDashboard(): Promise<void> {
   setError(null);
   try {
-    await Promise.all([loadCurrent(), loadHistory(), loadSessions()]);
+    if ("fonts" in document) await document.fonts.ready;
+    await Promise.all([loadCurrent(), loadHistory()]);
   } catch (error) {
     setError(error instanceof Error ? `Dashboard data could not be loaded: ${error.message}` : "Dashboard data could not be loaded");
   }
 }
-
-ui.unitSelect.addEventListener("change", () => {
-  state.unit = ui.unitSelect.value === "c" ? "c" : "f";
-  refreshCurrentDisplay();
-  void loadHistory().catch((error: unknown) => {
-    setError(error instanceof Error ? error.message : "History could not be loaded");
-  });
-});
 
 ui.rangeControls.addEventListener("click", (event) => {
   const button = (event.target as HTMLElement).closest<HTMLButtonElement>("button[data-range]");
@@ -388,10 +451,28 @@ ui.rangeControls.addEventListener("click", (event) => {
   });
 });
 
-setInterval(refreshCurrentDisplay, 30_000);
+ui.targetTemp.addEventListener("input", () => {
+  const target = Number(ui.targetTemp.value);
+  if (!Number.isFinite(target) || target < TARGET_MIN_F || target > TARGET_MAX_F) return;
+  state.targetF = target;
+  try {
+    if (typeof window !== "undefined") window.localStorage.setItem(TARGET_STORAGE_KEY, String(target));
+  } catch {
+    // Keep the control functional even when local storage is unavailable.
+  }
+  refreshHeatDisplay();
+});
+
+ui.targetTemp.addEventListener("change", () => {
+  const target = Number(ui.targetTemp.value);
+  if (!Number.isFinite(target) || target < TARGET_MIN_F || target > TARGET_MAX_F) {
+    ui.targetTemp.value = String(state.targetF);
+  }
+});
+
 setInterval(() => {
   void loadCurrent().then((changed) => {
-    if (changed) return Promise.all([loadHistory(), loadSessions()]);
+    if (changed) return loadHistory();
     return undefined;
   }).catch(() => {
     if (state.current) refreshCurrentDisplay();

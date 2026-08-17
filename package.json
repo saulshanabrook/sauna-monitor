@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "esbuild frontend/app.ts --bundle --format=esm --target=es2022 --minify --outfile=public/app.js",
+    "backfill:audit": "node scripts/run-tts-storage-backfill.mjs",
     "check": "npm run typecheck && npm run typecheck:frontend && npm run test && npm run build",
     "db:create": "wrangler d1 create sauna-monitor-db --binding DB --update-config",
     "db:migrate:local": "wrangler d1 migrations apply sauna-monitor-db --local",
